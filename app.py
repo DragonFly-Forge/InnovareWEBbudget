@@ -7,8 +7,12 @@ from db_connection import get_db_connection
 from smart_logic import get_daily_spending_limit
 from flask import render_template # Add this to your imports
 import random
+import os
 
-# Place this function BEFORE your routes
+app = Flask(__name__)
+
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 def get_simulated_price(current_price):
     """
     Simulates a market change for your youth budgeting project.
@@ -150,4 +154,5 @@ def index():
     # This serves your HTML file instead of JSON
     return render_template('index.html')
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+   port = int(os.environ.get("PORT", 5000))
+   app.run(host='0.0.0.0', port=port)
