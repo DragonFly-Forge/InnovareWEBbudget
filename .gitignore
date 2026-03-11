@@ -1,0 +1,10 @@
+# Python bytecode (compiled files)
+__pycache__/
+*.py[cod]
+
+# Environment variables (secret database URLs/passwords)
+.env
+
+# Virtual environments
+venv/
+env/
