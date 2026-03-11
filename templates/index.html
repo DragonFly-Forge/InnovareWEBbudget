@@ -66,7 +66,7 @@
 
     <div class="glass" style="border-color: var(--purple);">
         <h3 class="neon-text" style="color: var(--purple); text-shadow: 0 0 10px var(--purple);">INVESTMENT CENTER</h3>
-        <div id="portfolio-list"><p style="color: #666; text-align: center;">No active simulations...</p></div>
+        <div id="portfolio-list"><p style="color: #666; text-align: center;">Simulation mode active...</p></div>
         <input type="text" id="i-asset" placeholder="Asset (e.g., Apple)">
         <input type="number" id="i-amt" placeholder="Invest Amount (₹)">
         <button class="btn-blue" style="background: var(--purple); box-shadow: 0 0 10px var(--purple);" onclick="invest()">INITIALIZE INVESTMENT</button>
@@ -96,39 +96,43 @@
 </table>
 
 <script>
+    const API_BASE = "https://innovarewebbudget.onrender.com"; // Your live URL
     let currentUserId = null;
     let chart;
 
     async function login() {
         const username = document.getElementById('l-user').value;
         const password = document.getElementById('l-pass').value;
-        const res = await fetch('http://127.0.0.1:5000/api/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username, password})
-        });
-        if (res.ok) {
-            currentUserId = (await res.json()).user_id;
-            document.getElementById('auth-overlay').style.display = 'none';
-            load();
-        } else alert("Access Denied");
+        try {
+            const res = await fetch(`${API_BASE}/api/login`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            });
+            if (res.ok) {
+                currentUserId = (await res.json()).user_id;
+                document.getElementById('auth-overlay').style.display = 'none';
+                load();
+            } else alert("Access Denied: Invalid Credentials");
+        } catch (e) { alert("Server is waking up... try again in 30 seconds."); }
     }
 
     async function register() {
         const username = document.getElementById('r-user').value;
         const password = document.getElementById('r-pass').value;
         const budget = document.getElementById('r-budget').value;
-        await fetch('http://127.0.0.1:5000/api/register', {
+        const res = await fetch(`${API_BASE}/api/register`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({username, password, budget: parseFloat(budget)})
         });
-        alert("Registration Successful. Please Login.");
+        if(res.ok) alert("Account Created! Use Login above.");
+        else alert("Registration Failed");
     }
 
     async function submit(type) {
         const route = type === 'income' ? '/api/add-income' : '/api/add-transaction';
-        await fetch(`http://127.0.0.1:5000${route}`, {
+        await fetch(`${API_BASE}${route}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -141,47 +145,40 @@
         load();
     }
 
-    async function invest() {
-        const asset_name = document.getElementById('i-asset').value;
-        const amount = parseFloat(document.getElementById('i-amt').value);
-        if (!asset_name || !amount) return alert("Enter asset name and amount");
-        const res = await fetch('http://127.0.0.1:5000/api/invest', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user_id: currentUserId, asset_name, amount})
-        });
-        if (res.ok) { load(); document.getElementById('i-asset').value = ''; document.getElementById('i-amt').value = ''; }
+    function invest() {
+        alert("Investment Center is in simulation mode for this demo version.");
     }
 
-    async function loadPortfolio() {
-        const res = await fetch(`http://127.0.0.1:5000/api/portfolio/${currentUserId}`);
-        const data = await res.json();
-        const list = document.getElementById('portfolio-list');
-        if (data.length === 0) return;
-        list.innerHTML = data.map(item => `
-            <div style="border-bottom: 1px solid #222; padding: 5px 0;">
-                <div style="display:flex; justify-content: space-between;">
-                    <span>${item.asset}</span>
-                    <span style="color: ${item.profit_loss >= 0 ? 'var(--green)' : 'var(--red)'}">${item.profit_loss >= 0 ? '▲' : '▼'} ₹${Math.abs(item.profit_loss)}</span>
-                </div>
-                <div style="font-size: 0.7rem; color: #888;">Live Value: ₹${item.current_value}</div>
-            </div>
-        `).join('');
+    function downloadReport() { 
+        window.location.href = `${API_BASE}/api/export/${currentUserId}`; 
     }
 
-    function downloadReport() { window.location.href = `http://127.0.0.1:5000/api/export/${currentUserId}`; }
-    function logout() { currentUserId = null; document.getElementById('auth-overlay').style.display = 'flex'; }
-    async function wipe() { if (confirm("Delete all transactions?")) { await fetch(`http://127.0.0.1:5000/api/clear-data/${currentUserId}`, {method: 'DELETE'}); load(); } }
+    function logout() { 
+        currentUserId = null; 
+        document.getElementById('auth-overlay').style.display = 'flex'; 
+    }
+
+    async function wipe() { 
+        if (confirm("Permanently wipe all transaction data?")) { 
+            await fetch(`${API_BASE}/api/clear-data/${currentUserId}`, {method: 'DELETE'}); 
+            load(); 
+        } 
+    }
 
     async function load() {
-        const sRes = await fetch(`http://127.0.0.1:5000/api/smart-summary/${currentUserId}`);
+        if(!currentUserId) return;
+
+        // Fetch Smart Summary
+        const sRes = await fetch(`${API_BASE}/api/smart-summary/${currentUserId}`);
         const s = await sRes.json();
+        
         const savings = s.total_income > 0 ? (((s.total_income - s.total_spent) / s.total_income) * 100).toFixed(1) : 0;
         document.getElementById('savings-percent').innerText = `${savings}%`;
-        document.getElementById('t-inc').innerText = `₹${s.total_income}`;
-        document.getElementById('t-lim').innerText = `₹${s.daily_limit}`;
+        document.getElementById('t-inc').innerText = `₹${s.total_income || 0}`;
+        document.getElementById('t-lim').innerText = `₹${s.daily_limit || 0}`;
 
-        const tRes = await fetch(`http://127.0.0.1:5000/api/transactions/${currentUserId}`);
+        // Fetch Transaction History
+        const tRes = await fetch(`${API_BASE}/api/transactions/${currentUserId}`);
         const tData = await tRes.json();
         const body = document.querySelector('#h-table tbody');
         body.innerHTML = '';
@@ -194,23 +191,28 @@
                 catData[t.category] = (catData[t.category] || 0) + t.amount;
                 trendData[t.date] = (trendData[t.date] || 0) + t.amount;
             }
-            body.insertAdjacentHTML('beforeend', `<tr><td>${t.date}</td><td>${t.icon} ${t.description}</td><td>${t.category}</td><td style="color:${t.type==='income'?'#39ff14':'#ff4d4d'}">${t.type==='income'?'+':'-'}₹${t.amount}</td></tr>`);
+            body.insertAdjacentHTML('beforeend', `
+                <tr>
+                    <td>${t.date}</td>
+                    <td>${t.description}</td>
+                    <td>${t.category}</td>
+                    <td style="color:${t.type==='income'?'#39ff14':'#ff4d4d'}">
+                        ${t.type==='income'?'+':'-'}₹${t.amount}
+                    </td>
+                </tr>`);
         });
 
-        loadPortfolio();
         updateChart(catData, trendData);
     }
 
     function updateChart(catData, trendData) {
         const ctx = document.getElementById('chart').getContext('2d');
         const type = document.getElementById('chart-selector').value;
-        
         if (chart) chart.destroy();
 
         let labels, values, bgColor, borderColor;
 
         if (type === 'line') {
-            // Sort dates for the line chart
             labels = Object.keys(trendData).sort();
             values = labels.map(date => trendData[date]);
             bgColor = 'rgba(0, 242, 255, 0.2)';
@@ -232,7 +234,7 @@
                     backgroundColor: bgColor,
                     borderColor: borderColor,
                     borderWidth: type === 'line' ? 2 : 0,
-                    tension: 0.3, // Curve for line chart
+                    tension: 0.3,
                     fill: type === 'line'
                 }]
             },
